@@ -70,6 +70,7 @@ struct ImGuiGroupData;              // Stacked storage data for BeginGroup()/End
 struct ImGuiInputTextState;         // Internal state of the currently focused/edited text input box
 struct ImGuiItemHoveredDataBackup;  // Backup and restore IsItemHovered() internal data
 struct ImGuiMenuColumns;            // Simple column measurement, currently used for MenuItem() only
+struct ImGuiMultiSelectState;       // Multi-selection state
 struct ImGuiNavMoveResult;          // Result of a directional navigation move query result
 struct ImGuiNextWindowData;         // Storage for SetNexWindow** functions
 struct ImGuiPopupData;              // Storage for current popup stack
@@ -702,6 +703,17 @@ struct ImGuiColumns
     }
 };
 
+struct IMGUI_API ImGuiMultiSelectState
+{
+    ImGuiMultiSelectData    In;                     // The In requests are set and returned by BeginMultiSelect()
+    ImGuiMultiSelectData    Out;                    // The Out requests are finalized and returned by EndMultiSelect()
+    bool                    InRangeDstPassedBy;     // (Internal) set by the the item that match NavJustMovedToId when InRequestRangeSetNav is set.
+    bool                    InRequestSetRangeNav;   // (Internal) set by BeginMultiSelect() when using Shift+Navigation. Because scrolling may be affected we can't afford a frame of lag with Shift+Navigation.
+
+    ImGuiMultiSelectState() { Clear(); }
+    void Clear()            { In.Clear(); Out.Clear(); InRangeDstPassedBy = InRequestSetRangeNav = false; }
+};
+
 // Data shared between all ImDrawList instances
 struct IMGUI_API ImDrawListSharedData
 {
@@ -861,6 +873,8 @@ struct ImGuiContext
     ImVector<ImGuiPopupData>OpenPopupStack;                     // Which popups are open (persistent)
     ImVector<ImGuiPopupData>BeginPopupStack;                    // Which level of BeginPopup() we are in (reset every frame)
     ImGuiNextWindowData     NextWindowData;                     // Storage for SetNextWindow** functions
+    void*                   NextItemMultiSelectData;
+    bool                    NextItemMultiSelectDataIsSet;
     bool                    NextTreeNodeOpenVal;                // Storage for SetNextTreeNode** functions
     ImGuiCond               NextTreeNodeOpenCond;
 
@@ -959,8 +973,10 @@ struct ImGuiContext
     ImVector<char>          PrivateClipboard;                   // If no custom clipboard handler is defined
 
     // Range-Select/Multi-Select
-    // [This is unused in this branch, but left here to facilitate merging/syncing multiple branches]
     ImGuiID                 MultiSelectScopeId;
+    ImGuiWindow*            MultiSelectScopeWindow;
+    ImGuiMultiSelectFlags   MultiSelectFlags;
+    ImGuiMultiSelectState   MultiSelectState;
 
     // Platform support
     ImVec2                  PlatformImePos;                     // Cursor position request & last passed to the OS Input Method Editor
@@ -1032,6 +1048,8 @@ struct ImGuiContext
         LastActiveIdTimer = 0.0f;
         LastValidMousePos = ImVec2(0.0f, 0.0f);
         MovingWindow = NULL;
+        NextItemMultiSelectData = NULL;
+        NextItemMultiSelectDataIsSet = false;
         NextTreeNodeOpenVal = false;
         NextTreeNodeOpenCond = 0;
 
@@ -1094,6 +1112,8 @@ struct ImGuiContext
         TooltipOverrideCount = 0;
 
         MultiSelectScopeId = 0;
+        MultiSelectScopeWindow = NULL;
+        MultiSelectFlags = 0;
 
         PlatformImePos = PlatformImeLastPos = ImVec2(FLT_MAX, FLT_MAX);
 
@@ -1457,7 +1477,6 @@ namespace ImGui
     IMGUI_API void          PushMultiItemsWidths(int components, float width_full);
     IMGUI_API void          PushItemFlag(ImGuiItemFlags option, bool enabled);
     IMGUI_API void          PopItemFlag();
-    IMGUI_API bool          IsItemToggledSelection();                                           // was the last item selection toggled? (after Selectable(), TreeNode() etc. We only returns toggle _event_ in order to handle clipping correctly)
     IMGUI_API ImVec2        GetWorkRectMax();
 
     // Logging/Capture
@@ -1505,6 +1524,10 @@ namespace ImGui
     IMGUI_API void          PushColumnClipRect(int column_index = -1);
     IMGUI_API ImGuiID       GetColumnsID(const char* str_id, int count);
     IMGUI_API ImGuiColumns* FindOrCreateColumns(ImGuiWindow* window, ImGuiID id);
+
+    // New Multi-Selection/Range-Selection API (FIXME-WIP)
+    IMGUI_API void          MultiSelectItemHeader(ImGuiID id, bool* p_selected);
+    IMGUI_API void          MultiSelectItemFooter(ImGuiID id, bool* p_selected, bool* p_pressed);
 
     // Tab Bars
     IMGUI_API bool          BeginTabBarEx(ImGuiTabBar* tab_bar, const ImRect& bb, ImGuiTabBarFlags flags);
