@@ -1209,7 +1209,7 @@ void ImGui::Separator()
 
     // Horizontal Separator
     if (window->DC.CurrentColumns)
-        PopClipRect();
+        PushColumnsBackground();
 
     float x1 = window->Pos.x;
     float x2 = window->Pos.x + window->Size.x;
@@ -1221,7 +1221,7 @@ void ImGui::Separator()
     if (!ItemAdd(bb, 0))
     {
         if (window->DC.CurrentColumns)
-            PushColumnClipRect();
+            PopColumnsBackground();
         return;
     }
 
@@ -1232,7 +1232,7 @@ void ImGui::Separator()
 
     if (window->DC.CurrentColumns)
     {
-        PushColumnClipRect();
+        PopColumnsBackground();
         window->DC.CurrentColumns->LineMinY = window->DC.CursorPos.y;
     }
 }
@@ -5304,7 +5304,7 @@ bool ImGui::Selectable(const char* label, bool selected, ImGuiSelectableFlags fl
     const ImGuiStyle& style = g.Style;
 
     if ((flags & ImGuiSelectableFlags_SpanAllColumns) && window->DC.CurrentColumns) // FIXME-OPT: Avoid if vertically clipped.
-        PopClipRect();
+        PushColumnsBackground();
 
     ImGuiID id = window->GetID(label);
     ImVec2 label_size = CalcTextSize(label, NULL, true);
@@ -5348,7 +5348,7 @@ bool ImGui::Selectable(const char* label, bool selected, ImGuiSelectableFlags fl
     if (!item_add)
     {
         if ((flags & ImGuiSelectableFlags_SpanAllColumns) && window->DC.CurrentColumns)
-            PushColumnClipRect();
+            PopColumnsBackground();
         return false;
     }
 
@@ -5394,7 +5394,7 @@ bool ImGui::Selectable(const char* label, bool selected, ImGuiSelectableFlags fl
 
     if ((flags & ImGuiSelectableFlags_SpanAllColumns) && window->DC.CurrentColumns)
     {
-        PushColumnClipRect();
+        PopColumnsBackground();
         bb.Max.x -= (GetContentRegionMax().x - max_x);
     }
 

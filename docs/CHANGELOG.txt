@@ -80,6 +80,7 @@ Other Changes:
 - PlotLines, PlotHistogram: Ignore NaN values when calculating min/max bounds. (#2485)
 - Columns: Fixed boundary of clipping being off by 1 pixel within the left column. (#125)
 - Columns: Fixed SameLine(offset > 0) inside columns not using column-local offset. (#125)
+- Columns: Fixed Separator and Selectable with SpanAllColumns flag from creating an extraneous draw command. (#125)
 - Separator: Declare its thickness (1.0f) to the layout, making items around separator more symmetrical.
 - Combo, Slider, Scrollbar: Improve rendering in situation when there's only a few pixels available (<3 pixels).
 - Nav: Fixed Drag/Slider functions going into text input mode when keyboard CTRL is held while pressing NavActivate.

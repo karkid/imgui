@@ -8398,7 +8398,7 @@ void ImGui::SetupColumnIndex(int column_index)
     ImGuiColumnData* column = &columns->Columns[column_index];
     columns->Current = column_index;
 
-    window->DrawList->ChannelsSetCurrent(columns->Current);
+    window->DrawList->ChannelsSetCurrent(columns->Current + 1);
     columns->LineMaxY = ImMax(columns->LineMaxY, window->DC.CursorPos.y);
 
     const float base_x = columns->HostWorkRect.Min.x;
@@ -8538,15 +8538,23 @@ void ImGui::SetColumnWidth(int column_index, float width)
     SetColumnOffset(column_index + 1, GetColumnOffset(column_index) + width);
 }
 
-void ImGui::PushColumnClipRect(int column_index)
+// Get into the columns background draw command (which is generally the same draw command as before we called BeginColumns)
+void ImGui::PushColumnsBackground()
 {
     ImGuiWindow* window = GetCurrentWindowRead();
     ImGuiColumns* columns = window->DC.CurrentColumns;
-    if (column_index < 0)
-        column_index = columns->Current;
+    window->DrawList->ChannelsSetCurrent(0);
+    int cmd_size = window->DrawList->CmdBuffer.Size;
+    PushClipRect(columns->HostClipRect.Min, columns->HostClipRect.Max, false); // This should not create a ImDrawCmd
+    IM_ASSERT(cmd_size == window->DrawList->CmdBuffer.Size);
+}
 
-    ImGuiColumnData* column = &columns->Columns[column_index];
-    PushClipRect(column->ClipRect.Min, column->ClipRect.Max, false);
+void ImGui::PopColumnsBackground()
+{
+    ImGuiWindow* window = GetCurrentWindowRead();
+    ImGuiColumns* columns = window->DC.CurrentColumns;
+    window->DrawList->ChannelsSetCurrent(columns->Current + 1);
+    PopClipRect();
 }
 
 ImGuiColumns* ImGui::FindOrCreateColumns(ImGuiWindow* window, ImGuiID id)
@@ -8606,6 +8614,7 @@ void ImGui::BeginColumns(const char* str_id, int columns_count, ImGuiColumnsFlag
     columns->MaxX = ImMax(work_rect_width, columns->MinX + 1.0f);
     columns->HostCursorPosY = window->DC.CursorPos.y;
     columns->HostCursorMaxPosX = window->DC.CursorMaxPos.x;
+    columns->HostClipRect = window->ClipRect;
     columns->HostWorkRect = window->WorkRect;
 
     // Clear data if columns count changed
@@ -8639,7 +8648,7 @@ void ImGui::BeginColumns(const char* str_id, int columns_count, ImGuiColumnsFlag
     }
 
     if (columns->Count > 1)
-        window->DrawList->ChannelsSplit(columns->Count);
+        window->DrawList->ChannelsSplit(columns->Count + 1);
 
     // Setup first column
     const float start_y = window->DC.CursorPos.y;
