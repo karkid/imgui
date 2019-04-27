@@ -8668,10 +8668,8 @@ void ImGui::EndColumns()
 
     PopItemWidth();
     if (columns->Count > 1)
-    {
         PopClipRect();
-        window->DrawList->ChannelsMerge();
-    }
+
     columns->Rect.Max.y = ImMax(columns->LineMaxY, window->DC.CursorPos.y);
 
     // Draw columns borders and handle resize
@@ -8680,8 +8678,10 @@ void ImGui::EndColumns()
     if (!(columns->Flags & ImGuiColumnsFlags_NoBorder) && !window->SkipItems)
     {
         // We clip Y boundaries CPU side because very long triangles are mishandled by some GPU drivers.
-        const float y1 = ImMax(columns->Rect.Min.y, window->ClipRect.Min.y);
-        const float y2 = ImMin(columns->Rect.Max.y, window->ClipRect.Max.y);
+        if (columns->Count > 1)
+            window->DrawList->ChannelsSetCurrent(0);
+        const float y1 = ImMax(columns->Rect.Min.y, columns->HostClipRect.Min.y);
+        const float y2 = ImMin(columns->Rect.Max.y, columns->HostClipRect.Max.y);
         int dragging_column = -1;
         for (int n = 1; n < columns->Count; n++)
         {
@@ -8722,6 +8722,10 @@ void ImGui::EndColumns()
         }
     }
     columns->IsBeingResized = is_being_resized;
+
+    // Flatten draw data
+    if (columns->Count > 1)
+        window->DrawList->ChannelsMerge();
 
     // FIXME: Expose IsItemXXX data?
     window->WorkRect = columns->HostWorkRect;
