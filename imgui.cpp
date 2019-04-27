@@ -1140,7 +1140,7 @@ ImGuiStyle::ImGuiStyle()
     ItemInnerSpacing        = ImVec2(4,4);      // Horizontal and vertical spacing between within elements of a composed widget (e.g. a slider and its label)
     TouchExtraPadding       = ImVec2(0,0);      // Expand reactive bounding box for touch-based system where touch position is not accurate enough. Unfortunately we don't sort widgets so priority on overlap will always be given to the first widget. So don't grow this too much!
     IndentSpacing           = 21.0f;            // Horizontal spacing when e.g. entering a tree node. Generally == (FontSize + FramePadding.x*2).
-    ColumnsMinSpacing       = 6.0f;             // Minimum horizontal spacing between two columns
+    ColumnsMinSpacing       = 6.0f;             // Minimum horizontal spacing between two columns. Preferably > (FramePadding.x + 1).
     ScrollbarSize           = 16.0f;            // Width of the vertical scrollbar, Height of the horizontal scrollbar
     ScrollbarRounding       = 9.0f;             // Radius of grab corners rounding for scrollbar
     GrabMinSize             = 10.0f;            // Minimum width/height of a grab box for slider/scrollbar
@@ -5436,7 +5436,8 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
         window->InnerMainRect.Max.x = window->Pos.x + window->Size.x - ImMax(window->ScrollbarSizes.x, window->WindowBorderSize);
         window->InnerMainRect.Max.y = window->Pos.y + window->Size.y - ImMax(window->ScrollbarSizes.y, window->WindowBorderSize);
 
-        // Inner clipping rectangle
+        // Inner clipping rectangle will extend a little bit outside the work region.
+        // This is to allow e.g. Selectable or CollapsingHeader or some separators to cover that space.
         // Force round operator last to ensure that e.g. (int)(max.x-min.x) in user's render code produce correct result.
         window->InnerClipRect.Min.x = ImFloor(0.5f + window->InnerMainRect.Min.x + ImMax(0.0f, ImFloor(window->WindowPadding.x * 0.5f - window->WindowBorderSize)));
         window->InnerClipRect.Min.y = ImFloor(0.5f + window->InnerMainRect.Min.y);
