@@ -675,11 +675,12 @@ struct ImGuiColumns
 {
     ImGuiID             ID;
     ImGuiColumnsFlags   Flags;
+    ImRect              Rect;
     bool                IsFirstFrame;
     bool                IsBeingResized;
     int                 Current;
     int                 Count;
-    float               MinX, MaxX;
+    float               OffMinX, OffMaxX;       // Offsets from HostWorkRect.Min.x
     float               LineMinY, LineMaxY;
     float               HostCursorPosY;         // Backup of CursorPos at the time of BeginColumns()
     float               HostCursorMaxPosX;      // Backup of CursorMaxPos at the time of BeginColumns()
@@ -696,7 +697,7 @@ struct ImGuiColumns
         IsBeingResized = false;
         Current = 0;
         Count = 1;
-        MinX = MaxX = 0.0f;
+        OffMinX = OffMaxX = 0.0f;
         LineMinY = LineMaxY = 0.0f;
         HostCursorPosY = 0.0f;
         HostCursorMaxPosX = 0.0f;

@@ -8440,12 +8440,12 @@ int ImGui::GetColumnsCount()
 
 static float OffsetNormToPixels(const ImGuiColumns* columns, float offset_norm)
 {
-    return offset_norm * (columns->MaxX - columns->MinX);
+    return offset_norm * (columns->OffMaxX - columns->OffMinX);
 }
 
 static float PixelsToOffsetNorm(const ImGuiColumns* columns, float offset)
 {
-    return offset / (columns->MaxX - columns->MinX);
+    return offset / (columns->OffMaxX - columns->OffMinX);
 }
 
 static const float COLUMNS_HIT_RECT_HALF_WIDTH = 4.0f;
@@ -8477,7 +8477,7 @@ float ImGui::GetColumnOffset(int column_index)
     IM_ASSERT(column_index < columns->Columns.Size);
 
     const float t = columns->Columns[column_index].OffsetNorm;
-    const float x_offset = ImLerp(columns->MinX, columns->MaxX, t);
+    const float x_offset = ImLerp(columns->OffMinX, columns->OffMaxX, t);
     return x_offset;
 }
 
@@ -8520,8 +8520,8 @@ void ImGui::SetColumnOffset(int column_index, float offset)
     const float width = preserve_width ? GetColumnWidthEx(columns, column_index, columns->IsBeingResized) : 0.0f;
 
     if (!(columns->Flags & ImGuiColumnsFlags_NoForceWithinWindow))
-        offset = ImMin(offset, columns->MaxX - g.Style.ColumnsMinSpacing * (columns->Count - column_index));
-    columns->Columns[column_index].OffsetNorm = PixelsToOffsetNorm(columns, offset - columns->MinX);
+        offset = ImMin(offset, columns->OffMaxX - g.Style.ColumnsMinSpacing * (columns->Count - column_index));
+    columns->Columns[column_index].OffsetNorm = PixelsToOffsetNorm(columns, offset - columns->OffMinX);
 
     if (preserve_width)
         SetColumnOffset(column_index + 1, offset + ImMax(g.Style.ColumnsMinSpacing, width));
@@ -8610,9 +8610,12 @@ void ImGui::BeginColumns(const char* str_id, int columns_count, ImGuiColumnsFlag
 #else
     const float work_rect_width = window->WorkRect.GetWidth();
 #endif
-    columns->MinX = -g.Style.ItemSpacing.x;
-    columns->MaxX = ImMax(work_rect_width, columns->MinX + 1.0f);
-    columns->HostCursorPosY = window->DC.CursorPos.y;
+    const float start_y = window->DC.CursorPos.y;
+    columns->OffMinX = -g.Style.ItemSpacing.x;
+    columns->OffMaxX = ImMax(work_rect_width, columns->OffMinX + 1.0f);
+    columns->Rect.Min = ImVec2(window->WorkRect.Min.x + columns->OffMinX, start_y);
+    columns->Rect.Max = ImVec2(window->WorkRect.Min.x + columns->OffMaxX, start_y);
+    columns->HostCursorPosY = start_y;
     columns->HostCursorMaxPosX = window->DC.CursorMaxPos.x;
     columns->HostClipRect = window->ClipRect;
     columns->HostWorkRect = window->WorkRect;
@@ -8621,7 +8624,7 @@ void ImGui::BeginColumns(const char* str_id, int columns_count, ImGuiColumnsFlag
     if (columns->Columns.Size != 0 && columns->Columns.Size != columns_count + 1)
         columns->Columns.resize(0);
 
-    // Initialize defaults
+    // Initialize default width
     columns->IsFirstFrame = (columns->Columns.Size == 0);
     if (columns->Columns.Size == 0)
     {
@@ -8639,19 +8642,18 @@ void ImGui::BeginColumns(const char* str_id, int columns_count, ImGuiColumnsFlag
     for (int n = 0; n < columns_count; n++)
     {
         ImGuiColumnData* column = &columns->Columns[n];
-        float offset_n0 = GetColumnOffset(n);
-        float offset_n1 = GetColumnOffset(n + 1);
-        float clip_x1 = ImFloor(base_x + offset_n0);
-        float clip_x2 = ImFloor(base_x + offset_n1 - 1.0f);
+        const float offset_n0 = GetColumnOffset(n);
+        const float offset_n1 = GetColumnOffset(n + 1);
+        const float clip_x1 = ImFloor(base_x + offset_n0);
+        const float clip_x2 = ImFloor(base_x + offset_n1 - 1.0f);
         column->ClipRect = ImRect(clip_x1, -FLT_MAX, clip_x2, +FLT_MAX);
-        column->ClipRect.ClipWith(window->ClipRect);
+        column->ClipRect.ClipWith(columns->HostClipRect);
     }
 
     if (columns->Count > 1)
         window->DrawList->ChannelsSplit(columns->Count + 1);
 
     // Setup first column
-    const float start_y = window->DC.CursorPos.y;
     columns->LineMinY = columns->LineMaxY = start_y;
     columns->Current = -1;
     SetupColumnIndex(0);
@@ -8670,15 +8672,16 @@ void ImGui::EndColumns()
         PopClipRect();
         window->DrawList->ChannelsMerge();
     }
-    columns->LineMaxY = ImMax(columns->LineMaxY, window->DC.CursorPos.y);
+    columns->Rect.Max.y = ImMax(columns->LineMaxY, window->DC.CursorPos.y);
 
     // Draw columns borders and handle resize
+    // The IsBeingResized flag ensure we preserve pre-resize columns width so back-and-forth are not lossy
     bool is_being_resized = false;
     if (!(columns->Flags & ImGuiColumnsFlags_NoBorder) && !window->SkipItems)
     {
         // We clip Y boundaries CPU side because very long triangles are mishandled by some GPU drivers.
-        const float y1 = ImMax(columns->HostCursorPosY, window->ClipRect.Min.y);
-        const float y2 = ImMin(columns->LineMaxY, window->ClipRect.Max.y);
+        const float y1 = ImMax(columns->Rect.Min.y, window->ClipRect.Min.y);
+        const float y2 = ImMin(columns->Rect.Max.y, window->ClipRect.Max.y);
         int dragging_column = -1;
         for (int n = 1; n < columns->Count; n++)
         {
@@ -8720,9 +8723,10 @@ void ImGui::EndColumns()
     }
     columns->IsBeingResized = is_being_resized;
 
+    // FIXME: Expose IsItemXXX data?
     window->WorkRect = columns->HostWorkRect;
     window->DC.CursorPos.x = (float)(int)(window->WorkRect.Min.x);
-    window->DC.CursorPos.y = columns->LineMaxY;
+    window->DC.CursorPos.y = columns->Rect.Max.y;
     if (!(columns->Flags & ImGuiColumnsFlags_GrowParentContentsSize))
         window->DC.CursorMaxPos.x = columns->HostCursorMaxPosX;  // Restore cursor max pos, as columns don't grow parent
     window->DC.CurrentColumns = NULL;
@@ -8746,6 +8750,7 @@ void ImGui::Columns(int columns_count, const char* id, bool border)
     if (columns_count != 1)
         BeginColumns(id, columns_count, flags);
 }
+
 
 //-----------------------------------------------------------------------------
 // [SECTION] DRAG AND DROP
@@ -9690,11 +9695,17 @@ void ImGui::ShowMetricsWindow(bool* p_open)
             ImGui::TreePop();
         }
 
-        static void NodeColumns(const ImGuiColumns* columns)
+        static void NodeColumns(ImGuiWindow* window, const ImGuiColumns* columns)
         {
-            if (!ImGui::TreeNode((void*)(uintptr_t)columns->ID, "Columns Id: 0x%08X, Count: %d, Flags: 0x%04X", columns->ID, columns->Count, columns->Flags))
+            bool node_open = ImGui::TreeNode((void*)(uintptr_t)columns->ID, "Columns Id: 0x%08X, Count: %d, Flags: 0x%04X", columns->ID, columns->Count, columns->Flags);
+            if (ImGui::IsItemHovered())
+            {
+                ImDrawList* draw_list = GetForegroundDrawList(window);
+                draw_list->AddRect(columns->Rect.Min, columns->Rect.Max, IM_COL32(0, 255, 0, 100));
+            }
+            if (!node_open)
                 return;
-            ImGui::BulletText("Width: %.1f (MinX: %.1f, MaxX: %.1f)", columns->MaxX - columns->MinX, columns->MinX, columns->MaxX);
+            ImGui::BulletText("Width: %.1f (MinX: %.1f, MaxX: %.1f)", columns->OffMaxX - columns->OffMinX, columns->OffMinX, columns->OffMaxX);
             for (int column_n = 0; column_n < columns->Columns.Size; column_n++)
                 ImGui::BulletText("Column %02d: OffsetNorm %.3f (= %.1f px)", column_n, columns->Columns[column_n].OffsetNorm, OffsetNormToPixels(columns, columns->Columns[column_n].OffsetNorm));
             ImGui::TreePop();
@@ -9732,10 +9743,10 @@ void ImGui::ShowMetricsWindow(bool* p_open)
             if (window->RootWindow != window) NodeWindow(window->RootWindow, "RootWindow");
             if (window->ParentWindow != NULL) NodeWindow(window->ParentWindow, "ParentWindow");
             if (window->DC.ChildWindows.Size > 0) NodeWindows(window->DC.ChildWindows, "ChildWindows");
-            if (window->ColumnsStorage.Size > 0 && ImGui::TreeNode("Columns", "Columns sets (%d)", window->ColumnsStorage.Size))
+            if (window->ColumnsStorage.Size > 0 && ImGui::TreeNode("Columns", "Columns (%d)", window->ColumnsStorage.Size))
             {
                 for (int n = 0; n < window->ColumnsStorage.Size; n++)
-                    NodeColumns(&window->ColumnsStorage[n]);
+                    NodeColumns(window, &window->ColumnsStorage[n]);
                 ImGui::TreePop();
             }
             ImGui::BulletText("Storage: %d bytes", window->StateStorage.Data.Size * (int)sizeof(ImGuiStorage::Pair));
