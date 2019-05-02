@@ -568,8 +568,7 @@ struct ImGuiGroupData
 {
     ImVec2      BackupCursorPos;
     ImVec2      BackupCursorMaxPos;
-    ImVec1      BackupIndent;
-    ImVec1      BackupGroupOffset;
+    ImRect      BackupWorkRect;
     ImVec2      BackupCurrentLineSize;
     float       BackupCurrentLineTextBaseOffset;
     ImGuiID     BackupActiveIdIsAlive;
@@ -681,8 +680,9 @@ struct ImGuiColumns
     int                 Count;
     float               MinX, MaxX;
     float               LineMinY, LineMaxY;
-    float               BackupCursorPosY;       // Backup of CursorPos at the time of BeginColumns()
-    float               BackupCursorMaxPosX;    // Backup of CursorMaxPos at the time of BeginColumns()
+    float               HostCursorPosY;         // Backup of CursorPos at the time of BeginColumns()
+    float               HostCursorMaxPosX;      // Backup of CursorMaxPos at the time of BeginColumns()
+    ImRect              HostWorkRect;           // Backup of WorkRect at the time of BeginColumns()
     ImVector<ImGuiColumnData> Columns;
 
     ImGuiColumns()      { Clear(); }
@@ -696,8 +696,8 @@ struct ImGuiColumns
         Count = 1;
         MinX = MaxX = 0.0f;
         LineMinY = LineMaxY = 0.0f;
-        BackupCursorPosY = 0.0f;
-        BackupCursorMaxPosX = 0.0f;
+        HostCursorPosY = 0.0f;
+        HostCursorMaxPosX = 0.0f;
         Columns.clear();
     }
 };
@@ -1163,10 +1163,6 @@ struct IMGUI_API ImGuiWindowTempData
     ImVector<float>         TextWrapPosStack;
     ImVector<ImGuiGroupData>GroupStack;
     short                   StackSizesBackup[6];    // Store size of various stacks for asserting
-
-    ImVec1                  Indent;                 // Indentation / start position from left of window (increased by TreePush/TreePop, etc.)
-    ImVec1                  GroupOffset;
-    ImVec1                  ColumnsOffset;          // Offset to the current column (if ColumnsCurrent > 0). FIXME: This and the above should be a stack to allow use cases like Tree->Column->Tree. Need revamp columns API.
     ImGuiColumns*           CurrentColumns;         // Current columns set
 
     ImGuiWindowTempData()
@@ -1196,9 +1192,6 @@ struct IMGUI_API ImGuiWindowTempData
         TextWrapPos = -1.0f;
         memset(StackSizesBackup, 0, sizeof(StackSizesBackup));
 
-        Indent = ImVec1(0.0f);
-        GroupOffset = ImVec1(0.0f);
-        ColumnsOffset = ImVec1(0.0f);
         CurrentColumns = NULL;
     }
 };
@@ -1258,6 +1251,7 @@ struct IMGUI_API ImGuiWindow
     ImRect                  OuterRectClipped;                   // = WindowRect just after setup in Begin(). == window->Rect() for root window.
     ImRect                  InnerMainRect, InnerClipRect;
     ImRect                  ContentsRegionRect;                 // FIXME: This is currently confusing/misleading. Maximum visible content position ~~ Pos + (SizeContentsExplicit ? SizeContentsExplicit : Size - ScrollbarSizes) - CursorStartPos, per axis
+    ImRect                  WorkRect;                           // FIXME: This is currently == ContentsRegionRect
     int                     LastFrameActive;                    // Last frame number the window was Active.
     float                   ItemWidthDefault;
     ImGuiMenuColumns        MenuColumns;                        // Simplified columns storage for menu items
@@ -1502,6 +1496,7 @@ namespace ImGui
     // New Columns API (FIXME-WIP)
     IMGUI_API void          BeginColumns(const char* str_id, int count, ImGuiColumnsFlags flags = 0); // setup number of columns. use an identifier to distinguish multiple column sets. close with EndColumns().
     IMGUI_API void          EndColumns();                                                             // close columns
+    IMGUI_API void          SetupColumnIndex(int column_index);
     IMGUI_API void          PushColumnClipRect(int column_index = -1);
     IMGUI_API ImGuiID       GetColumnsID(const char* str_id, int count);
     IMGUI_API ImGuiColumns* FindOrCreateColumns(ImGuiWindow* window, ImGuiID id);
