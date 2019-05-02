@@ -8646,7 +8646,7 @@ void ImGui::BeginColumns(const char* str_id, int columns_count, ImGuiColumnsFlag
         const float offset_n1 = GetColumnOffset(n + 1);
         const float clip_x1 = ImFloor(base_x + offset_n0);
         const float clip_x2 = ImFloor(base_x + offset_n1 - 1.0f);
-        column->ClipRect = ImRect(clip_x1, -FLT_MAX, clip_x2, +FLT_MAX);
+        column->ClipRect = ImRect(clip_x1, columns->Rect.Min.y, clip_x2, +FLT_MAX);
         column->ClipRect.ClipWith(columns->HostClipRect);
     }
 
